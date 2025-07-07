@@ -13,9 +13,14 @@ class ValueStandardizationAgent(BaseAgent):
     # =========================
     def _get_prompt_template(self) -> ChatPromptTemplate:
         # Gather unique values for each column (sampled from the data)
-        sample_block = "\n".join([
-            f"- {col}: {self.df[col].dropna().unique()[:10].tolist()}" for col in self.df.columns
-        ])
+        sample_lines = []
+        for col in self.df.columns:
+            try:
+                uniques = self.df[col].dropna().astype(str).unique()[:10].tolist()
+                sample_lines.append(f"- {col}: {uniques}")
+            except Exception as e:
+                sample_lines.append(f"- {col}: [Could not extract unique values: {e}]")
+        sample_block = "\n".join(sample_lines)
         prompt = f"""
 You are an expert Data Engineer responsible for standardizing values in a dataset for robust, automated data cleaning.
 
@@ -62,7 +67,10 @@ Return your response inside a single markdown code block as a JSON object.
     def profile_columns(self):
         profile = []
         for col in self.df.columns:
-            unique_values = list(self.df[col].dropna().unique())
+            try:
+                unique_values = list(self.df[col].dropna().astype(str).unique())
+            except Exception as e:
+                unique_values = [f"Could not extract unique values: {e}"]
             if len(unique_values) > 0:
                 profile.append({
                     "name": col,

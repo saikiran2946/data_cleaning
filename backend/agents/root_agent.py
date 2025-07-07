@@ -25,9 +25,9 @@ class RootAgent:
             "Outliers": OutlierAgent,
             "Normalization": NormalizationAgent,
             "Value Standardization": ValueStandardizationAgent,
-            "Feature Generation": FeatureGenerationAgent,
+            #"Feature Generation": FeatureGenerationAgent,
             "Validation": ValidatingAgent,
-            "General Issue": GeneralIssueAgent,
+            #"General Issue": GeneralIssueAgent,
         }
         
         # Initialize all agents
@@ -82,9 +82,9 @@ class RootAgent:
             "Outliers": "Manages extreme or anomalous values in numeric columns.",
             "Normalization": "Scales numeric data for modeling (e.g., StandardScaler, MinMaxScaler).",
             "Value Standardization": "Corrects inconsistent categorical values (e.g., 'USA', 'U.S.A.', 'United States').",
-            "Feature Generation": "Creates new features from existing ones to improve analytical power.",
+            #"Feature Generation": "Creates new features from existing ones to improve analytical power.",
             "Validation": "Performs a final, comprehensive check to ensure all data quality issues are resolved.",
-            "General Issue": "Handles more complex, user-described issues that don't fit other categories."
+            #"General Issue": "Handles more complex, user-described issues that don't fit other categories."
         }
         available_agents_text = "\n".join([f"- {name}: {desc}" for name, desc in agent_descriptions.items() if name in self.available_agent_names])
 
@@ -176,7 +176,7 @@ Example Output Format (as plain text, not a code block):
         except Exception as e:
             # Fallback: just run all agents in default order
             fallback_plan = [
-                {"agent_name": name, "reason": "Default fallback plan."}
+                {"agent_name": name}
                 for name in self.available_agent_names
             ]
             # --- Ensure Validation is always last in fallback ---

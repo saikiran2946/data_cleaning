@@ -286,9 +286,14 @@ def display_value_standardization_ui(agent):
             st.write("**Current unique values in this column:**")
             if column_name in st.session_state.df.columns:
                 unique_vals = st.session_state.df[column_name].dropna().unique()
-                st.write(f"Found {len(unique_vals)} unique values: {unique_vals[:10].tolist()}")
-                if len(unique_vals) > 10:
-                    st.write(f"... and {len(unique_vals) - 10} more values")
+                # Ensure unique_vals is a numpy array before calling .tolist()
+                if hasattr(unique_vals, 'tolist'):
+                    unique_vals_list = unique_vals.tolist()
+                else:
+                    unique_vals_list = list(unique_vals)
+                st.write(f"Found {len(unique_vals_list)} unique values: {unique_vals_list[:10]}")
+                if len(unique_vals_list) > 10:
+                    st.write(f"... and {len(unique_vals_list) - 10} more values")
             else:
                 st.warning(f"Column '{column_name}' not found in current dataset")
             st.write("**Suggested Mappings:**")
@@ -318,20 +323,31 @@ def display_feature_generation_ui(agent):
             st.session_state.user_choices[feature_name] = {"agent": agent, "choice": feature}
 
 def display_validation_results(agent):
-    """Display the UI for final data validation results."""
+    """Display the UI for final data validation results and allow user to apply fixes."""
     step = st.session_state.get("current_step", 0)
     cache_key = f"actions_ValidatingAgent_{step}"
     if cache_key not in st.session_state:
         st.session_state[cache_key] = agent.generate_actions()
-    results = st.session_state[cache_key]
-    if not results: return st.error("Validation agent failed to produce a result.")
-    result = results[0]
-    st.subheader("Final Validation")
-    st.json(result)
-    if result.get("status") == "completed":
-        st.success("Data validation passed!")
-    else:
-        st.warning("Data validation found issues.")
+    actions = st.session_state[cache_key]
+    if not actions:
+        st.success("No remaining issues found. Data validation passed!")
+        return
+
+    st.subheader("Final Validation & Fixes")
+    for i, issue in enumerate(actions):
+        col = issue.get("column", "unknown")
+        reason = issue.get("reason", "No reason provided.")
+        suggested_action = issue.get("suggested_action", "skip")
+        code = issue.get("code", "# No code provided.")
+        st.markdown(f"**Column:** {col}  \n**Issue Type:** {issue.get('type', 'unknown')}  \n**Reason:** {reason}  \n**Suggested Action:** {suggested_action}")
+        st.code(code, language="python")
+        options = ["accept", "skip"]
+        user_choice = st.radio(f"Apply fix for {col}?", options, index=0, key=f"validate_{col}_{i}")
+        st.session_state.user_choices[f"validate_{col}_{i}"] = {
+            "agent": agent,
+            "choice": issue if user_choice == "accept" else {"code": "", "reason": "User skipped this fix."}
+        }
+        st.markdown("---")
 
 def initialize_session_state():
     """Initialize Streamlit session state variables if not already set."""
@@ -502,6 +518,55 @@ def apply_user_notes_to_data_dict(data_dict, user_notes):
             add_note_to_all(f"Foreign key instruction: foreign key for {colname} is {table}.{field}")
     return data_dict
 
+def read_with_header_fix(file, **read_kwargs) -> pd.DataFrame:
+    """
+    Read any CSV/Excel file-like object and automatically correct:
+      ▸ leading blank rows
+      ▸ leading blank columns
+      ▸ header rows that were pushed down one line
+    Returns a clean DataFrame with df.attrs['log'] describing changes.
+    """
+    # Detect extension from file.name if available
+    ext = file.name.lower() if hasattr(file, 'name') else ''
+    if ext.endswith((".xls", ".xlsx")):
+        read = pd.read_excel
+        file.seek(0)
+        raw = read(file, header=None, **read_kwargs)
+    else:
+        read = pd.read_csv
+        file.seek(0)
+        raw = read(file, header=None, skip_blank_lines=False, **read_kwargs)
+
+    log = []
+    df = raw.copy()
+
+    # Drop completely blank top rows
+    while df.shape[0] > 0 and df.iloc[0].isna().all():
+        df = df.iloc[1:]
+        log.append("Dropped empty top row")
+
+    # Drop completely blank left columns
+    while df.shape[1] > 0 and df.iloc[:, 0].isna().all():
+        df = df.iloc[:, 1:]
+        log.append("Dropped empty left most column")
+
+    # Detect "real" header row (heuristic)
+    if df.shape[0] > 0:
+        header_candidate = df.iloc[0]
+        looks_like_header = (
+            header_candidate.map(lambda x: isinstance(x, str) and bool(re.search(r"[A-Za-z]", str(x)))).all()
+        )
+        if looks_like_header:
+            df.columns = header_candidate
+            df = df.iloc[1:]
+            log.append("Promoted first row to header")
+
+    # Final tidy up
+    df = df.reset_index(drop=True)
+    df.columns = df.columns.astype(str).str.strip()
+    df.attrs["log"] = log
+    return df
+
 # =========================
 # Main App Logic
 # =========================
@@ -532,7 +597,6 @@ def main():
                         temp_data_dict = parse_data_dictionary(data_dict_file)
                         st.session_state.data_dictionary = temp_data_dict
                         st.session_state.user_uploaded_data_dictionary = temp_data_dict.copy()
-                
                 # After DataFrame is loaded, if generating data dictionary, ask for general user notes
                 if upload_dict == "No, generate automatically" and "df" in st.session_state and st.session_state.df is not None:
                     st.subheader("Add any general notes or points for the data dictionary (optional)")
@@ -547,7 +611,7 @@ def main():
     if "uploaded_file" in st.session_state and st.session_state.uploaded_file is not None:
         if "df" not in st.session_state or st.session_state.df is None:
             try:
-                df = pd.read_csv(st.session_state.uploaded_file) if st.session_state.uploaded_file.name.endswith('.csv') else pd.read_excel(st.session_state.uploaded_file)
+                df = read_with_header_fix(st.session_state.uploaded_file)
                 st.session_state.df = df
                 # Initialize RootAgent with memory
                 if st.session_state.df is not None and st.session_state.data_dictionary is not None:
@@ -571,8 +635,8 @@ def main():
     #     if "data_dictionary" not in st.session_state or st.session_state.data_dictionary is None:
     #         st.session_state.data_dictionary = generate_data_dictionary(st.session_state.df, llm)
 
-    if st.session_state.df is not None:
-        # --- Add Profile Tab ---
+    if st.session_state.df is not None and st.session_state.data_dictionary is not None:
+        # --- Add Profile and Cleaning Workflow Tabs ---
         tab_labels = ["Profile", "Cleaning Workflow"]
         if "active_tab" not in st.session_state:
             st.session_state.active_tab = tab_labels[0]  # Default to Profile
@@ -587,11 +651,16 @@ def main():
             st.write("**Shape:**", df.shape)
             st.write("**Columns:**", list(df.columns))
             st.write("**Data Types:**")
-            st.dataframe(df.dtypes.astype(str).reset_index().rename(columns={0: 'dtype', 'index': 'column'}))
+            dtypes_df = pd.DataFrame({'column': df.columns, 'dtype': df.dtypes.astype(str).values})
+            st.dataframe(dtypes_df)
             st.write("**Missing Values (per column):**")
-            st.dataframe(df.isnull().sum().reset_index().rename(columns={0: 'missing', 'index': 'column'}))
+            missing_counts = df.isnull().sum()
+            missing_df = pd.DataFrame({'column': missing_counts.index.astype(str), 'missing': missing_counts.values})
+            st.dataframe(missing_df)
             st.write("**Unique Values (per column):**")
-            st.dataframe(df.nunique().reset_index().rename(columns={0: 'unique', 'index': 'column'}))
+            unique_counts = df.nunique()
+            unique_df = pd.DataFrame({'column': unique_counts.index.astype(str), 'unique': unique_counts.values})
+            st.dataframe(unique_df)
             # Check if there are any numerical columns before displaying statistics
             numerical_df = df.select_dtypes(include=np.number)
             if not numerical_df.empty:
@@ -603,9 +672,7 @@ def main():
             if "data_dictionary" in st.session_state and st.session_state.data_dictionary is not None:
                 st.subheader("Data Dictionary in Use")
                 try:
-                    # Convert data dictionary to a displayable format
                     display_dict = st.session_state.data_dictionary.copy()
-                    # Convert any problematic columns to strings
                     for col in display_dict.columns:
                         if display_dict[col].dtype == 'object':
                             display_dict[col] = display_dict[col].astype(str)
@@ -616,9 +683,7 @@ def main():
             if "data_dictionary" in st.session_state and hasattr(st.session_state, 'user_uploaded_data_dictionary') and st.session_state.user_uploaded_data_dictionary is not None:
                 st.subheader("User-Provided Data Dictionary")
                 try:
-                    # Convert data dictionary to a displayable format
                     display_dict = st.session_state.user_uploaded_data_dictionary.copy()
-                    # Convert any problematic columns to strings
                     for col in display_dict.columns:
                         if display_dict[col].dtype == 'object':
                             display_dict[col] = display_dict[col].astype(str)
@@ -709,6 +774,12 @@ def main():
                             if data.get("agent") != agent:
                                 continue
                             choice = data["choice"]
+                            # Special handling for ValidatingAgent: use real column from user_choice
+                            if agent_name == "Validation" and column.startswith("validate_"):
+                                actual_col = choice.get("column", None)
+                            else:
+                                agent_col = choice.get("name", column)
+                                actual_col = find_actual_column_name(cleaned_df, agent_col)
                             # Handle duplicate agent specially as it acts on the whole dataframe and has a special key
                             if column == "duplicates":
                                 if choice.get("suggested_action") == "drop_duplicates":
@@ -729,7 +800,6 @@ def main():
                                         log_entry["status"] = "error"
                                         log_entry["error"] = str(e)
                                     step_logs.append(log_entry)
-                                # After handling, continue to the next choice to avoid the generic column-based logic.
                                 continue
                             # Handle feature generation agent specially
                             if isinstance(agent, feature_generation_module.FeatureGenerationAgent):
@@ -743,7 +813,6 @@ def main():
                                     "error": None
                                 }
                                 if formula and isinstance(formula, str) and formula.strip():
-                                    # Always create the new column, do not check for existence
                                     if not formula.strip().startswith(f"df['{feature_name}']"):
                                         formula_to_run = f"df['{feature_name}'] = {formula}"
                                     else:
@@ -765,10 +834,49 @@ def main():
                                     log_entry["status"] = "skipped"
                                     log_entry["error"] = "No formula provided or formula is empty."
                                 step_logs.append(log_entry)
+                            # Special handling for ValidatingAgent: apply all fixes using real column
+                            elif agent_name == "Validation" and column.startswith("validate_"):
+                                code_to_run = agent.generate_code_from_choice(actual_col, choice)
+                                log_entry = {
+                                    "column": actual_col,
+                                    "user_choice": choice,
+                                    "code": code_to_run,
+                                    "status": None,
+                                    "error": None
+                                }
+                                # For table-level issues, skip column existence check
+                                if actual_col == "__table__":
+                                    if code_to_run and code_to_run.strip() and not code_to_run.strip().startswith("#"):
+                                        try:
+                                            exec(code_to_run, {'df': cleaned_df, 'pd': pd, 'np': np})
+                                            log_entry["status"] = "success"
+                                        except Exception as e:
+                                            log_entry["status"] = "error"
+                                            log_entry["error"] = str(e)
+                                    else:
+                                        log_entry["status"] = "skipped"
+                                        log_entry["error"] = "No code generated or code is empty."
+                                    step_logs.append(log_entry)
+                                    continue
+                                # For column-level issues, check column existence
+                                if not actual_col or actual_col not in cleaned_df.columns:
+                                    log_entry["status"] = "error"
+                                    log_entry["error"] = f"Column '{actual_col}' does not exist in DataFrame at this step."
+                                    step_logs.append(log_entry)
+                                    continue
+                                if code_to_run and code_to_run.strip() and not code_to_run.strip().startswith("#"):
+                                    try:
+                                        exec(code_to_run, {'df': cleaned_df, 'pd': pd, 'np': np})
+                                        log_entry["status"] = "success"
+                                    except Exception as e:
+                                        log_entry["status"] = "error"
+                                        log_entry["error"] = str(e)
+                                else:
+                                    log_entry["status"] = "skipped"
+                                    log_entry["error"] = "No code generated or code is empty."
+                                step_logs.append(log_entry)
                             else:
                                 # Handle other agents (including value standardization)
-                                agent_col = choice.get("name", column)
-                                actual_col = find_actual_column_name(cleaned_df, agent_col)
                                 if not actual_col or actual_col not in cleaned_df.columns:
                                     log_entry = {
                                         "column": agent_col,
@@ -789,7 +897,6 @@ def main():
                                 }
                                 # Execute the code if it exists
                                 if code_to_run and code_to_run.strip():
-                                    # Check if the code contains actual executable statements (not just comments)
                                     code_lines = [line.strip() for line in code_to_run.split('\n') if line.strip()]
                                     executable_lines = [line for line in code_lines if not line.startswith('#') and line]
                                     if executable_lines:
@@ -817,6 +924,30 @@ def main():
                                 "status": log_entry["status"],
                                 "error": log_entry.get("error")
                             })
+                            # Special handling for ValidatingAgent: apply all fixes
+                            if agent_name == "Validation":
+                                # The agent returns a list of issues/fixes, each with code
+                                for issue in agent.generate_actions():
+                                    code_to_run = issue.get("code", "")
+                                    log_entry = {
+                                        "column": issue.get("column", "unknown"),
+                                        "user_choice": issue,
+                                        "code": code_to_run,
+                                        "status": None,
+                                        "error": None
+                                    }
+                                    if code_to_run and code_to_run.strip() and not code_to_run.strip().startswith("#"):
+                                        try:
+                                            exec(code_to_run, {'df': cleaned_df, 'pd': pd, 'np': np})
+                                            log_entry["status"] = "success"
+                                        except Exception as e:
+                                            log_entry["status"] = "error"
+                                            log_entry["error"] = str(e)
+                                    else:
+                                        log_entry["status"] = "skipped"
+                                        log_entry["error"] = "No code generated or code is empty."
+                                    step_logs.append(log_entry)
+                                break
                     except Exception as e:
                         st.error(f"Error during cleaning step: {e}")
                     # Save log for this step
@@ -829,6 +960,8 @@ def main():
                     st.session_state.current_step = step + 1
                     st.session_state.active_tab = "Cleaning Workflow"
                     st.rerun()
+    else:
+        pass  # No controls here; handled above in the correct context
 
 # =========================
 # Entry Point
