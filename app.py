@@ -116,45 +116,64 @@ def display_ui_for_agent(agent):
         ui_function(agent)
 
 def display_data_type_ui(agent):
-    """Display the UI for data type suggestions and user selection."""
+    """Display the UI for data type suggestions and user selection with compact spacing and the selectbox directly visible (no expander)."""
     step = st.session_state.get("current_step", 0)
     cache_key = f"actions_DataTypeAgent_{step}"
     if cache_key not in st.session_state:
         st.session_state[cache_key] = agent.generate_actions()
     actions = st.session_state[cache_key]
-    if not actions: return st.info("No data type suggestions available.")
+    if not actions:
+        return st.info("No data type suggestions available.")
     for col_action in actions:
         col_name = col_action.get('name', 'Unknown')
         dtype = col_action.get('dtype', 'N/A')
         reason = col_action.get('reason', '')
-        expander_title = f"**{col_name}** - {reason}"
-        with st.expander(expander_title, expanded=True):
-            options = ["skip", "int64", "float64", "datetime64[ns]", "category", "string"]
-            suggestion = col_action.get("suggested_dtype", "skip")
-            idx = options.index(suggestion) if suggestion in options else 0
-            user_dtype = st.selectbox("New data type:", options, index=idx, key=f"dtype_{col_action['name']}_{step}")
-            st.session_state.user_choices[col_action['name']] = {"agent": agent, "choice": {"suggested_action": user_dtype, "reason": "User selected data type."}}
+        suggestion = col_action.get("suggested_dtype", "skip")
+        st.markdown(f"**{col_name}**", unsafe_allow_html=True)
+        st.markdown(f"<span style='font-weight:bold'>Current dtype:</span> <span style='font-weight:normal'>{dtype}</span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='font-weight:bold'>Reason:</span> <span style='font-weight:normal'>{reason}</span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='font-weight:bold'>Suggested dtype:</span> <span style='font-weight:normal'>{suggestion}</span>", unsafe_allow_html=True)
+        options = ["skip", "int64", "float64", "datetime64[ns]", "category", "string"]
+        idx = options.index(suggestion) if suggestion in options else 0
+        user_dtype = st.selectbox("", options, index=idx, key=f"dtype_{col_action['name']}_{step}")
+        st.session_state.user_choices[col_action['name']] = {"agent": agent, "choice": {"suggested_action": user_dtype, "reason": "User selected data type."}}
+        st.markdown("<hr style='margin: 8px 0;'>", unsafe_allow_html=True)
+
+    # Add custom CSS for even more compact spacing
+    st.markdown("""
+        <style>
+        .element-container { margin-bottom: 0.2rem !important; }
+        .stMarkdown p { margin-bottom: 0.2rem !important; }
+        .stSelectbox { margin-top: 0.2rem !important; margin-bottom: 0.2rem !important; }
+        hr { margin: 4px 0 !important; }
+        </style>
+    """, unsafe_allow_html=True)
 
 def display_missing_value_ui(agent):
-    """Display the UI for missing value handling and user selection."""
+    """Display the UI for missing value handling and user selection using the expander and radio button logic, with structured info above the options."""
     step = st.session_state.get("current_step", 0)
     cache_key = f"actions_MissingValueAgent_{step}"
     if cache_key not in st.session_state:
         st.session_state[cache_key] = agent.generate_actions()
     actions = st.session_state[cache_key]
-    if not actions: return st.info("No missing values found.")
+    if not actions:
+        return st.info("No missing values found.")
     for col_action in actions:
         col_name = col_action.get('name', 'Unknown')
+        missing_count = col_action.get('missing_count', 'N/A')
         reason = col_action.get('reason', '')
-        expander_title = f"**{col_name}** - {reason}"
+        suggestion = col_action.get('suggestion', '')
+        expander_title = f"**{col_name}**"
         with st.expander(expander_title, expanded=True):
+            st.markdown(f"<span style='font-weight:bold'>Missing value count:</span> <span style='font-weight:normal'>{missing_count}</span>", unsafe_allow_html=True)
+            st.markdown(f"<span style='font-weight:bold'>Reason:</span> <span style='font-weight:normal'>{reason}</span>", unsafe_allow_html=True)
+            st.markdown(f"<span style='font-weight:bold'>Suggestion:</span> <span style='font-weight:normal'>{suggestion}</span>", unsafe_allow_html=True)
             options = ["skip", "drop_rows_with_missing_values", "drop_column", "fillna_mean", "fillna_median", "fillna_mode", "fillna_constant"]
-            suggestion = col_action.get("suggested_action", "skip")
-            idx = options.index(suggestion) if suggestion in options else 0
+            suggestion_radio = col_action.get("suggested_action", "skip")
+            idx = options.index(suggestion_radio) if suggestion_radio in options else 0
             user_action = st.radio("Action:", options, index=idx, key=f"mv_action_{col_action['name']}_{step}")
             choice = {"suggested_action": user_action, "reason": "User selected missing value treatment."}
             if user_action == "fillna_constant":
-                # Pre-fill with agent suggestion if available
                 suggested_val = col_action.get("constant_value", "")
                 val = st.text_input("Constant value:", value=suggested_val, key=f"mv_const_{col_action['name']}_{step}")
                 choice["constant_value"] = val
@@ -171,15 +190,23 @@ def display_duplicate_ui(agent):
     action = actions[0]
     col_name = action.get('name', 'Unknown')
     reason = action.get('reason', '')
-    expander_title = f"**{col_name}** - {reason}"
-    with st.expander(expander_title, expanded=True):
-        options = ["skip", "drop_duplicates"]
-        suggestion = action.get("suggested_action", "skip")
-        idx = options.index(suggestion) if suggestion in options else 0
-        user_action = st.radio("Action:", options, index=idx, key=f"dup_action_{step}")
-        choice = dict(action)
-        choice["suggested_action"] = user_action
-        st.session_state.user_choices["duplicates"] = {"agent": agent, "choice": choice}
+    suggested_action = action.get("suggested_action", "skip")
+    duplicate_count = action.get('duplicates_count', 0)
+    st.markdown(
+        f"<b>Duplicate Rows:</b> {duplicate_count} <br>"
+        f"<b>Reason:</b> {reason} <br>"
+        f"<b>Suggested Action:</b> {suggested_action}",
+        unsafe_allow_html=True
+    )
+    options = ["skip", "drop_duplicates"]
+    suggestion = suggested_action
+    idx = options.index(suggestion) if suggestion in options else 0
+    user_action = st.radio("Action for duplicates:", options, index=idx, key=f"dup_action_{step}")
+    choice = dict(action)
+    choice["suggested_action"] = user_action
+    st.session_state.user_choices["duplicates"] = {"agent": agent, "choice": choice}
+    st.markdown("<hr style='margin:8px 0;'>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def display_outlier_ui(agent):
     """Display the UI for outlier detection and user selection."""
@@ -189,18 +216,28 @@ def display_outlier_ui(agent):
         st.session_state[cache_key] = agent.generate_actions()
     actions = st.session_state[cache_key]
     if not actions: return st.info("No numeric columns for outlier detection.")
+    st.markdown('<div class="scrollable-suggestion">', unsafe_allow_html=True)
     for col_action in actions:
         col_name = col_action.get('name', 'Unknown')
+        outlier_count = col_action.get('outlier_count', 0)
         reason = col_action.get('reason', '')
-        expander_title = f"**{col_name}** - {reason}"
-        with st.expander(expander_title, expanded=True):
-            options = ["skip", "clip_to_bounds", "winsorize", "remove_outliers", "flag_outliers"]
-            suggestion = col_action.get("suggested_action", "skip")
-            idx = options.index(suggestion) if suggestion in options else 0
-            user_action = st.radio("Action:", options, index=idx, key=f"outlier_{col_action['name']}_{step}")
-            choice = dict(col_action)
-            choice["suggested_action"] = user_action
-            st.session_state.user_choices[col_action['name']] = {"agent": agent, "choice": choice}
+        suggested_action = col_action.get("suggested_action", "skip")
+        st.markdown(
+            f"<b>Column:</b> {col_name} <br>"
+            f"<b>Outlier Count:</b> {outlier_count} <br>"
+            f"<b>Reason:</b> {reason} <br>"
+            f"<b>Suggested Action:</b> {suggested_action}",
+            unsafe_allow_html=True
+        )
+        options = ["skip", "clip_to_bounds", "winsorize", "remove_outliers", "flag_outliers"]
+        suggestion = col_action.get("suggested_action", "skip")
+        idx = options.index(suggestion) if suggestion in options else 0
+        user_action = st.radio(f"Action for {col_name}:", options, index=idx, key=f"outlier_{col_action['name']}_{step}")
+        choice = dict(col_action)
+        choice["suggested_action"] = user_action
+        st.session_state.user_choices[col_name] = {"agent": agent, "choice": choice}
+        st.markdown("<hr style='margin:8px 0;'>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def display_normalization_ui(agent):
     """Display the UI for normalization strategy selection."""
@@ -210,19 +247,24 @@ def display_normalization_ui(agent):
         st.session_state[cache_key] = agent.generate_actions()
     actions = st.session_state[cache_key]
     if not actions: return st.info("No columns suitable for normalization.")
+    st.markdown('<div class="scrollable-suggestion">', unsafe_allow_html=True)
     for col_action in actions:
         col_name = col_action.get('name', 'Unknown')
         reason = col_action.get('reason', '')
-        expander_title = f"**{col_name}** - {reason}"
-        with st.expander(expander_title, expanded=True):
-            st.markdown(f"**Column: {col_name}** - {reason}", unsafe_allow_html=True)
-            options = ["skip", "StandardScaler", "MinMaxScaler", "Log-Transform"]
-            suggestion = col_action.get("suggested_strategy", "skip")
-            idx = options.index(suggestion) if suggestion in options else 0
-            user_strategy = st.radio("Strategy:", options, index=idx, key=f"norm_{col_action['name']}_{step}")
-            choice = dict(col_action)
-            choice["suggested_strategy"] = user_strategy
-            st.session_state.user_choices[col_action['name']] = {"agent": agent, "choice": choice}
+        suggested_action = col_action.get("suggested_strategy", "skip")
+        st.markdown(
+            f"<b>Column:</b> {col_name} <br><b>Reason:</b> {reason} <br><b>Suggested Action:</b> {suggested_action}",
+            unsafe_allow_html=True
+        )
+        options = ["skip", "StandardScaler", "MinMaxScaler", "Log-Transform"]
+        suggestion = col_action.get("suggested_strategy", "skip")
+        idx = options.index(suggestion) if suggestion in options else 0
+        user_strategy = st.radio(f"Strategy for {col_name}:", options, index=idx, key=f"norm_{col_action['name']}_{step}")
+        choice = dict(col_action)
+        choice["suggested_strategy"] = user_strategy
+        st.session_state.user_choices[col_name] = {"agent": agent, "choice": choice}
+        st.markdown("<hr style='margin:8px 0;'>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def display_value_standardization_ui(agent):
     """Display the UI for value standardization and mapping selection."""
@@ -302,6 +344,8 @@ def initialize_session_state():
     if "cleaning_logs" not in st.session_state: st.session_state.cleaning_logs = []
     if "cleaning_plan" not in st.session_state: st.session_state.cleaning_plan = None
     if "cleaning_history" not in st.session_state: st.session_state.cleaning_history = []
+    if "data_dictionary" not in st.session_state: st.session_state.data_dictionary = None
+    if "user_uploaded_data_dictionary" not in st.session_state: st.session_state.user_uploaded_data_dictionary = None
 
 def parse_data_dictionary(file):
     """Parse a data dictionary file (CSV or Excel) and return it as a DataFrame."""
@@ -506,7 +550,14 @@ def main():
                 df = pd.read_csv(st.session_state.uploaded_file) if st.session_state.uploaded_file.name.endswith('.csv') else pd.read_excel(st.session_state.uploaded_file)
                 st.session_state.df = df
                 # Initialize RootAgent with memory
-                st.session_state.root_agent = RootAgent(df, st.session_state.get("data_dictionary"))
+                if st.session_state.df is not None and st.session_state.data_dictionary is not None:
+                    if (
+                        "root_agent" not in st.session_state
+                        or st.session_state.root_agent is None
+                        or getattr(st.session_state.root_agent, "df", None) is not st.session_state.df
+                        or getattr(st.session_state.root_agent, "data_dictionary", None) is not st.session_state.data_dictionary
+                    ):
+                        st.session_state.root_agent = RootAgent(st.session_state.df, st.session_state.data_dictionary)
                 st.session_state.user_choices = {}
                 st.session_state.current_step = 0
                 st.session_state.cleaning_logs = []
@@ -515,14 +566,21 @@ def main():
                 return
 
     # Generate data dictionary if not provided
-    if "df" in st.session_state and st.session_state.df is not None:
-        if "data_dictionary" not in st.session_state or st.session_state.data_dictionary is None:
-            st.session_state.data_dictionary = generate_data_dictionary(st.session_state.df, llm)
+    # (REMOVE or MODIFY this block to prevent automatic generation)
+    # if "df" in st.session_state and st.session_state.df is not None:
+    #     if "data_dictionary" not in st.session_state or st.session_state.data_dictionary is None:
+    #         st.session_state.data_dictionary = generate_data_dictionary(st.session_state.df, llm)
 
     if st.session_state.df is not None:
         # --- Add Profile Tab ---
-        tabs = st.tabs(["Profile", "Cleaning Workflow"])
-        with tabs[0]:
+        tab_labels = ["Profile", "Cleaning Workflow"]
+        if "active_tab" not in st.session_state:
+            st.session_state.active_tab = tab_labels[0]  # Default to Profile
+
+        selected_tab = st.radio("Select Tab", tab_labels, index=tab_labels.index(st.session_state.active_tab), horizontal=True, key="tab_radio")
+        st.session_state.active_tab = selected_tab
+
+        if selected_tab == "Profile":
             st.subheader("Dataset Profile Information")
             st.session_state.df = safe_fillna_unknown(st.session_state.df)
             df = st.session_state.df
@@ -547,33 +605,27 @@ def main():
                 try:
                     # Convert data dictionary to a displayable format
                     display_dict = st.session_state.data_dictionary.copy()
-                    
                     # Convert any problematic columns to strings
                     for col in display_dict.columns:
                         if display_dict[col].dtype == 'object':
                             display_dict[col] = display_dict[col].astype(str)
-                    
                     st.dataframe(display_dict)
                 except Exception as e:
                     st.warning(f"Could not display data dictionary due to serialization error: {e}")
                     st.write("Data dictionary exists but cannot be displayed in table format.")
-            
             if "data_dictionary" in st.session_state and hasattr(st.session_state, 'user_uploaded_data_dictionary') and st.session_state.user_uploaded_data_dictionary is not None:
                 st.subheader("User-Provided Data Dictionary")
                 try:
                     # Convert data dictionary to a displayable format
                     display_dict = st.session_state.user_uploaded_data_dictionary.copy()
-                    
                     # Convert any problematic columns to strings
                     for col in display_dict.columns:
                         if display_dict[col].dtype == 'object':
                             display_dict[col] = display_dict[col].astype(str)
-                    
                     st.dataframe(display_dict)
                 except Exception as e:
                     st.warning(f"Could not display user data dictionary due to serialization error: {e}")
                     st.write("User data dictionary exists but cannot be displayed in table format.")
-            
             if "data_dictionary" in st.session_state and st.session_state.data_dictionary is not None:
                 st.subheader("Column Profiles")
                 display_dict = st.session_state.data_dictionary.copy()
@@ -582,9 +634,21 @@ def main():
                     dtype = row.get("Data Type", "")
                     desc = row.get("Description", "")
                     st.markdown(f"**{col_name}** (Current: **{dtype}**) - {desc}", unsafe_allow_html=True)
-        
-        with tabs[1]:
+        elif selected_tab == "Cleaning Workflow":
+            # --- Ensure root_agent is always initialized and up to date ---
+            if (
+                st.session_state.df is not None and st.session_state.data_dictionary is not None and (
+                    "root_agent" not in st.session_state
+                    or st.session_state.root_agent is None
+                    or getattr(st.session_state.root_agent, "df", None) is not st.session_state.df
+                    or getattr(st.session_state.root_agent, "data_dictionary", None) is not st.session_state.data_dictionary
+                )
+            ):
+                st.session_state.root_agent = RootAgent(st.session_state.df, st.session_state.data_dictionary)
             root_agent = st.session_state.root_agent
+            if root_agent is None:
+                st.error("Root agent is not initialized. Please upload a dataset and ensure the data dictionary is loaded.")
+                return
             # --- Always use cached cleaning plan ---
             cleaning_plan = st.session_state.get("cleaning_plan")
             if cleaning_plan is None:
@@ -592,11 +656,9 @@ def main():
                 st.session_state.cleaning_plan = cleaning_plan
             total_steps = len(cleaning_plan)
             step = st.session_state.get("current_step", 0)
-
             # --- Add live preview of current data ---
             st.subheader("Current Data Preview")
             st.dataframe(ensure_arrow_compatible(st.session_state.df.head(10)))
-
             # If all steps are done, show final results
             if step >= total_steps:
                 st.success("All cleaning steps completed!")
@@ -604,7 +666,6 @@ def main():
                 st.dataframe(ensure_arrow_compatible(st.session_state.df))
                 st.write("### Full Cleaning Log (JSON)")
                 st.json(st.session_state.cleaning_logs)
-                
                 # Add download button for cleaned dataset
                 csv = st.session_state.df.to_csv(index=False).encode('utf-8')
                 st.download_button(
@@ -614,18 +675,15 @@ def main():
                     mime="text/csv"
                 )
                 return
-
             step_info = cleaning_plan[step]
             agent_name = step_info["agent_name"]
             st.header(f"Step {step+1} of {total_steps}: {agent_name}")
             st.write(step_info["reason"])
-
             agent = root_agent.get_agent(agent_name)
             if agent:
                 display_ui_for_agent(agent)
             else:
                 st.error(f"Could not find agent: {agent_name}")
-
             # Show cleaning log for this step
             st.subheader("Cleaning Log (JSON)")
             if len(st.session_state.cleaning_logs) > step:
@@ -635,11 +693,11 @@ def main():
             # Optionally, show all logs so far in a collapsible section
             with st.expander("Show All Cleaning Logs So Far"):
                 st.json(st.session_state.cleaning_logs)
-
             col1, col2 = st.columns([1, 1])
             with col1:
                 if st.button("Previous", disabled=step == 0):
                     st.session_state.current_step = max(0, step - 1)
+                    st.session_state.active_tab = "Cleaning Workflow"
                     st.rerun()
             with col2:
                 if st.button("Apply Changes and Next", key=f"apply_next_{step}"):
@@ -651,7 +709,6 @@ def main():
                             if data.get("agent") != agent:
                                 continue
                             choice = data["choice"]
-                            
                             # Handle duplicate agent specially as it acts on the whole dataframe and has a special key
                             if column == "duplicates":
                                 if choice.get("suggested_action") == "drop_duplicates":
@@ -674,7 +731,6 @@ def main():
                                     step_logs.append(log_entry)
                                 # After handling, continue to the next choice to avoid the generic column-based logic.
                                 continue
-                            
                             # Handle feature generation agent specially
                             if isinstance(agent, feature_generation_module.FeatureGenerationAgent):
                                 formula = choice.get("formula")
@@ -686,14 +742,12 @@ def main():
                                     "status": None,
                                     "error": None
                                 }
-                                
                                 if formula and isinstance(formula, str) and formula.strip():
                                     # Always create the new column, do not check for existence
                                     if not formula.strip().startswith(f"df['{feature_name}']"):
                                         formula_to_run = f"df['{feature_name}'] = {formula}"
                                     else:
                                         formula_to_run = formula
-                                    
                                     try:
                                         import datetime
                                         current_date = pd.Timestamp(datetime.datetime.now())
@@ -710,13 +764,11 @@ def main():
                                 else:
                                     log_entry["status"] = "skipped"
                                     log_entry["error"] = "No formula provided or formula is empty."
-                                
                                 step_logs.append(log_entry)
                             else:
                                 # Handle other agents (including value standardization)
                                 agent_col = choice.get("name", column)
                                 actual_col = find_actual_column_name(cleaned_df, agent_col)
-                                
                                 if not actual_col or actual_col not in cleaned_df.columns:
                                     log_entry = {
                                         "column": agent_col,
@@ -727,7 +779,6 @@ def main():
                                     }
                                     step_logs.append(log_entry)
                                     continue
-                                
                                 code_to_run = agent.generate_code_from_choice(actual_col, choice)
                                 log_entry = {
                                     "column": actual_col,
@@ -736,13 +787,11 @@ def main():
                                     "status": None,
                                     "error": None
                                 }
-                                
                                 # Execute the code if it exists
                                 if code_to_run and code_to_run.strip():
                                     # Check if the code contains actual executable statements (not just comments)
                                     code_lines = [line.strip() for line in code_to_run.split('\n') if line.strip()]
                                     executable_lines = [line for line in code_lines if not line.startswith('#') and line]
-                                    
                                     if executable_lines:
                                         try:
                                             if code_to_run and 'from scipy.stats import winsorize' in code_to_run:
@@ -755,9 +804,7 @@ def main():
                                 else:
                                     log_entry["status"] = "skipped"
                                     log_entry["error"] = "No code generated or code is empty."
-                                
                                 step_logs.append(log_entry)
-                            
                             # Record to persistent cleaning history for this file
                             st.session_state.cleaning_history.append({
                                 "step": step,
@@ -770,19 +817,17 @@ def main():
                                 "status": log_entry["status"],
                                 "error": log_entry.get("error")
                             })
-                            
                     except Exception as e:
                         st.error(f"Error during cleaning step: {e}")
-                    
                     # Save log for this step
                     if len(st.session_state.cleaning_logs) > step:
                         st.session_state.cleaning_logs[step] = step_logs
                     else:
                         st.session_state.cleaning_logs.append(step_logs)
-                    
                     # Always update df for next step with all changes
                     st.session_state.df = cleaned_df
                     st.session_state.current_step = step + 1
+                    st.session_state.active_tab = "Cleaning Workflow"
                     st.rerun()
 
 # =========================

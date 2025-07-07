@@ -41,7 +41,8 @@ class DuplicateAgent(BaseAgent):
         
         action = {
             "suggested_action": "drop_duplicates",
-            "reason": reason
+            "reason": reason,
+            "duplicates_count": num_duplicates
         }
         
         return [action]

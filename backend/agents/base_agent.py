@@ -159,6 +159,9 @@ Use this historical context to make better, more consistent decisions. Consider:
             for i, col_action in enumerate(actions):
                 if i < len(profile):
                     col_action.setdefault("name", profile[i].get("name"))
+                    # Pass through missing_count if present in profile
+                    if "missing_count" in profile[i]:
+                        col_action["missing_count"] = profile[i]["missing_count"]
                 col_action.setdefault("reason", "No reason provided by LLM.")
             return actions
             
@@ -257,7 +260,10 @@ else:
             )
             return code
 
-        # --- Special handling for datetime64[ns] conversion ---
+        # --- Special handling for float64 and int64 conversions ---
+        if action in ["float64", "int64", "category", "string"]:
+            code = f"df[{repr(column_name)}] = df[{repr(column_name)}].astype('{action}')"
+            return code
         if action == "datetime64[ns]":
             code = f"df[{repr(column_name)}] = pd.to_datetime(df[{repr(column_name)}], dayfirst=True, errors='coerce')"
             return code
@@ -269,11 +275,6 @@ else:
                 f"df[{repr(column_name)}] = pd.to_numeric(df[{repr(column_name)}], errors='coerce')\n"
                 f"df[{repr(column_name)}] = df[{repr(column_name)}].where((df[{repr(column_name)}] >= df[{repr(column_name)}].quantile(0.05)) & (df[{repr(column_name)}] <= df[{repr(column_name)}].quantile(0.95)), '')"
             )
-            return code
-
-        # --- Special handling for float64 and int64 conversions ---
-        if action in ["float64", "int64"]:
-            code = f"df[{repr(column_name)}] = pd.to_numeric(df[{repr(column_name)}], errors='coerce')"
             return code
 
         action_details = f"Action: {action}"

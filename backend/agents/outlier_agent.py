@@ -68,6 +68,13 @@ DATASET PROFILE:
         profile = []
         for col in self.df.select_dtypes(include=[np.number]).columns:
             stats = self.df[col].describe()
+            q1 = stats["25%"]
+            q3 = stats["75%"]
+            iqr = q3 - q1
+            lower_bound = q1 - 1.5 * iqr
+            upper_bound = q3 + 1.5 * iqr
+            outlier_mask = (self.df[col] < lower_bound) | (self.df[col] > upper_bound)
+            outlier_count = int(outlier_mask.sum())
             profile.append({
                 "name": col,
                 "mean": float(stats["mean"]),
@@ -76,6 +83,96 @@ DATASET PROFILE:
                 "25%": float(stats["25%"]),
                 "50%": float(stats["50%"]),
                 "75%": float(stats["75%"]),
-                "max": float(stats["max"])
+                "max": float(stats["max"]),
+                "outlier_count": outlier_count
             })
         return profile 
+
+    def _parse_llm_response(self, response: str, profile: list):
+        import json
+        try:
+            # Clean the response first
+            cleaned_response = response.strip()
+            # Try to extract JSON from markdown code blocks
+            import re
+            match = re.search(r"```json\n(.*?)\n```", cleaned_response, re.DOTALL)
+            if match:
+                json_str = match.group(1).strip()
+            else:
+                json_str = cleaned_response
+            # If no JSON found in code blocks, try to find JSON in the response
+            if not json_str or json_str == cleaned_response:
+                json_match = re.search(r'\{.*\}', cleaned_response, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                else:
+                    # If no JSON found, use outlier_count to determine action
+                    actions = []
+                    for col in profile:
+                        outlier_count = col.get("outlier_count", 0)
+                        if outlier_count > 0:
+                            actions.append({
+                                "name": col.get("name"),
+                                "suggested_action": "clip_to_bounds",
+                                "reason": f"{outlier_count} outliers detected; recommend handling outliers (e.g., clip_to_bounds).",
+                                "outlier_count": outlier_count
+                            })
+                        else:
+                            actions.append({
+                                "name": col.get("name"),
+                                "suggested_action": "skip",
+                                "reason": "No outliers detected; no action needed for this dataset.",
+                                "outlier_count": 0
+                            })
+                    return actions
+            # Parse the JSON
+            data = json.loads(json_str)
+            actions = data.get("columns", [])
+            # If actions is empty, use outlier_count to determine action
+            if not actions:
+                actions = []
+                for col in profile:
+                    outlier_count = col.get("outlier_count", 0)
+                    if outlier_count > 0:
+                        actions.append({
+                            "name": col.get("name"),
+                            "suggested_action": "clip_to_bounds",
+                            "reason": f"{outlier_count} outliers detected; recommend handling outliers (e.g., clip_to_bounds).",
+                            "outlier_count": outlier_count
+                        })
+                    else:
+                        actions.append({
+                            "name": col.get("name"),
+                            "suggested_action": "skip",
+                            "reason": "No outliers detected; no action needed for this dataset.",
+                            "outlier_count": 0
+                        })
+                return actions
+            # Ensure outlier_count is included in each action
+            for i, col_action in enumerate(actions):
+                if i < len(profile):
+                    col_action.setdefault("name", profile[i].get("name"))
+                    col_action.setdefault("outlier_count", profile[i].get("outlier_count", 0))
+                col_action.setdefault("reason", "No reason provided by LLM.")
+                col_action.setdefault("suggested_action", "skip")
+            return actions
+        except Exception as e:
+            # On error, use outlier_count to determine action
+            actions = []
+            for col in profile:
+                outlier_count = col.get("outlier_count", 0)
+                if outlier_count > 0:
+                    actions.append({
+                        "name": col.get("name"),
+                        "suggested_action": "clip_to_bounds",
+                        "reason": f"{outlier_count} outliers detected; recommend handling outliers (e.g., clip_to_bounds).",
+                        "outlier_count": outlier_count
+                    })
+                else:
+                    actions.append({
+                        "name": col.get("name"),
+                        "suggested_action": "skip",
+                        "reason": "No outliers detected; no action needed for this dataset.",
+                        "outlier_count": 0
+                    })
+            return actions 

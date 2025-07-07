@@ -67,6 +67,11 @@ class RootAgent:
 
         profile_parts.append("\nSample Rows:")
         profile_parts.append(self.df.head(5).to_string(index=False))
+
+        # Add unique value samples for categorical/text columns
+        for col in self.df.select_dtypes(include=['object', 'category']):
+            unique_vals = self.df[col].dropna().unique()
+            profile_parts.append(f"Column '{col}' unique values (sample): {list(unique_vals[:10])}")
         dataset_profile = "\n".join(profile_parts)
 
         # Describe agent capabilities for the prompt
@@ -89,15 +94,17 @@ You are a master AI Data Cleaning Strategist. Your responsibility is to conduct 
 
 CRITICAL THINKING:
 1.  **Examine the Full Picture:** Scrutinize the entire DATASET PROFILE and DATA DICTIONARY. Cross-reference them to find not just obvious issues (like missing values) but also subtle ones (e.g., a column is `int64` but the data dictionary says it represents categories and should be `object`).
-2.  **Justify Every Step:** For each agent you include in the plan, you must provide a compelling, data-driven reason. Your reason must be grounded in specific observations from the profile (e.g., "The 'Salary' column has a max value of 500000, which is a potential outlier, so the Outlier agent is needed.").
-3.  **Optimize the Order:** The sequence of operations is critical. Justify why your proposed order is the most logical. For example, it is almost always best to handle `Data Types` and `Missing Values` before `Outliers` or `Normalization`, as those operations depend on correct data types and complete data. `Feature Generation` should typically happen after initial cleaning.
-4.  **Be Decisive and Necessary:** Do not include an agent "just in case." If the profile shows no duplicates, the `Duplicates` agent is not needed. Your plan must be lean and targeted at solving the actual, observed problems.
+2.  **MANDATORY AGENTS:** You MUST always include all of the following agents in the cleaning plan, in this order: Data Types, Missing Values, Duplicates, Outliers, Normalization, Value Standardization, Validation.
+3.  **Context-Aware Decisions:** For each agent, analyze the dataset and data dictionary to determine if any action is needed. If action is needed, provide a clear, data-driven reason. If no action is needed, state 'No action needed for this dataset.'
+4.  **Justify Every Step:** Your reason for each agent must be grounded in specific observations from the profile (e.g., 'The Salary column has a max value of 500000, which is a potential outlier, so the Outlier agent is needed.' or 'No missing values found, so no action needed for Missing Values agent.').
+5.  **Optimize the Order:** The sequence of operations is critical. The required order is: Data Types, Missing Values, Duplicates, Outliers, Normalization, Value Standardization, Validation. Do not change this order.
 
 ACTION:
-- Based on your critical analysis, create a cleaning plan by selecting the most appropriate agents from the AVAILABLE AGENTS list.
-- The plan must be an ordered sequence of steps.
-- You must provide a clear, context-aware reason for including each agent and for the sequence you chose.
-- The "Validation" agent must ALWAYS be the final step.
+- For each agent, always include it in the plan, in the required order.
+- For each agent, provide a key 'agent_name' and a key 'reason'.
+- If no action is needed for an agent, the reason should be 'No action needed for this dataset.'
+- The plan must be an ordered sequence of steps, one for each agent.
+- The 'Validation' agent must ALWAYS be the final step.
 
 AVAILABLE AGENTS AND THEIR CAPABILITIES:
 {available_agents_text}
@@ -142,17 +149,30 @@ Example Output Format (as plain text, not a code block):
             # The prompt now asks for a "plan" key
             parsed_json = json.loads(content)
             plan = parsed_json.get("plan", [])
-            
-            # --- Ensure Validation is always last ---
-            validation_steps = [step for step in plan if step.get("agent_name") == "Validation"]
-            other_steps = [step for step in plan if step.get("agent_name") != "Validation"]
-            
-            # If validation was not included by the LLM, add it
-            if not validation_steps:
-                validation_steps = [{"agent_name": "Validation", "reason": "Final check to ensure data quality and consistency."}]
 
-            plan = other_steps + validation_steps
-            return plan
+            # --- Ensure all agents are present in the required order ---
+            required_agents = [
+                ("Data Types", "Fixes incorrect column data types (e.g., text instead of numbers, numbers instead of dates)."),
+                ("Missing Values", "Handles missing data through various imputation strategies (mean, median, mode, constant)."),
+                ("Duplicates", "Removes duplicate rows from the dataset."),
+                ("Outliers", "Manages extreme or anomalous values in numeric columns."),
+                ("Normalization", "Scales numeric data for modeling (e.g., StandardScaler, MinMaxScaler)."),
+                ("Value Standardization", "Corrects inconsistent categorical values (e.g., 'USA', 'U.S.A.', 'United States')."),
+                ("Validation", "Performs a final, comprehensive check to ensure all data quality issues are resolved.")
+            ]
+            # Build a dict for quick lookup
+            plan_dict = {step.get("agent_name"): step for step in plan}
+            final_plan = []
+            for agent_name, default_reason in required_agents:
+                if agent_name in plan_dict:
+                    step = plan_dict[agent_name]
+                    # Ensure reason is present
+                    if not step.get("reason"):
+                        step["reason"] = default_reason
+                    final_plan.append(step)
+                else:
+                    final_plan.append({"agent_name": agent_name, "reason": "No action needed for this dataset."})
+            return final_plan
         except Exception as e:
             # Fallback: just run all agents in default order
             fallback_plan = [

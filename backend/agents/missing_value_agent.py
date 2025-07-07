@@ -11,7 +11,7 @@ ROLE:
 You are an advanced, context-aware Data Cleaning Agent. Your expertise is in handling missing values in tabular datasets, making robust, explainable, and context-driven decisions for each column.
 
 You must always:
-- Analyze the dataset, data dictionary, and column names before making any decision.
+- Analyze the dataset, data dictionary, user notes, and column names before making any decision.
 - Infer the intended data type for each column from the data, business context, and data dictionary, not just the pandas dtype.
 - Justify every imputation and type decision with reference to the dataset's context, business meaning, and data dictionary.
 
@@ -68,10 +68,16 @@ DATASET PROFILE:
         profile = []
         for col in self.df.columns:
             if self.df[col].isnull().any():
-                missing_pct = (self.df[col].isnull().sum() / len(self.df)) * 100
+                missing_count = int(self.df[col].isnull().sum())
+                missing_pct = (missing_count / len(self.df)) * 100
                 profile.append({
                     "name": col,
                     "dtype": str(self.df[col].dtype),
-                    "missing_pct": round(missing_pct, 2),
+                    "missing_count": missing_count,
+                    "missing_pct": round(missing_pct, 2)
                 })
         return profile
+
+    def _parse_llm_response(self, response: str, profile: list):
+        # Only use the LLM's output for all columns, no primary key enforcement
+        return super()._parse_llm_response(response, profile)
