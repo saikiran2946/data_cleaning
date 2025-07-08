@@ -262,10 +262,12 @@ else:
 
         # --- Special handling for float64 and int64 conversions ---
         if action in ["float64", "int64", "category", "string"]:
-            code = f"df[{repr(column_name)}] = df[{repr(column_name)}].astype('{action}')"
+            # Use errors='ignore' to preserve original values that cannot be converted
+            code = f"df[{repr(column_name)}] = df[{repr(column_name)}].astype('{action}', errors='ignore')"
             return code
         if action == "datetime64[ns]":
-            code = f"df[{repr(column_name)}] = pd.to_datetime(df[{repr(column_name)}], dayfirst=True, errors='coerce')"
+            # Use errors='ignore' to preserve original values that cannot be converted
+            code = f"df[{repr(column_name)}] = pd.to_datetime(df[{repr(column_name)}], dayfirst=True, errors='ignore')"
             return code
 
         # --- Special handling for flag_outliers ---

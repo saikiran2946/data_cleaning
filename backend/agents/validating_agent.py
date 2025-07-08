@@ -13,6 +13,8 @@ You must:
 - For each column, consider its description, type, allowed values, and any constraints from the data dictionary.
 - For each issue, suggest the best fix and provide a single line of Python code to fix it (for a pandas DataFrame named 'df').
 - Only suggest fixes for issues that remain after all other agents have run.
+- When suggesting type conversions (e.g., pd.to_datetime, pd.to_numeric, astype), always use errors='ignore' (not 'coerce') so that original values are preserved and only valid conversions are made. Never blank out or remove values by coercion.
+- Only flag and fix issues that are truly important for data quality, analysis, or business outcomes. Ignore minor or unimportant issues that do not impact downstream use.
 
 For each issue, you must include:
 - "column": The exact column name (or "__table__" for table-level issues like duplicates).
