@@ -404,7 +404,7 @@ def generate_data_dictionary(df, llm):
         unique_vals = df[col].dropna().unique()
         allowed_values = unique_vals.tolist() if (dtype in ["object", "category"] and len(unique_vals) <= 10) else ""
         nullable = "Yes" if df[col].isnull().any() else "No"
-        is_primary_key = "Yes" if df[col].is_unique and not df[col].isnull().any() else "No"
+        is_primary_key = "No"  # Never infer primary key automatically
         constraints = []
         if df[col].is_unique:
             constraints.append("No duplicates")
@@ -446,14 +446,12 @@ def apply_user_notes_to_data_dict(data_dict, user_notes):
         if pk_col.lower() in col_names:
             pk_col_found = pk_col.lower()
             break
-    if pk_matches:
-        if pk_col_found:
-            data_dict["Is Primary Key"] = [
-                "Yes" if str(col).lower() == pk_col_found else "No"
-                for col in data_dict["Column Name"]
-            ]
-        else:
-            add_note_to_all(f"Primary key instruction: {pk_matches[0]}")
+    if pk_matches and pk_col_found:
+        data_dict["Is Primary Key"] = [
+            "Yes" if str(col).lower() == pk_col_found else "No"
+            for col in data_dict["Column Name"]
+        ]
+    # If no pk_matches or not found, do not modify 'Is Primary Key' (leave as 'No')
 
     # Nullable
     nullable_matches = re.findall(r'([\w_]+) is nullable', user_notes, re.IGNORECASE)
@@ -620,6 +618,21 @@ def main():
             try:
                 df = read_with_header_fix(st.session_state.uploaded_file)
                 st.session_state.df = df
+                # --- Drop rows with nulls in primary key columns if present ---
+                if (
+                    "data_dictionary" in st.session_state and st.session_state.data_dictionary is not None
+                    and "df" in st.session_state and st.session_state.df is not None
+                ):
+                    data_dict = st.session_state.data_dictionary
+                    # Only drop if user explicitly marked a column as primary key (not inferred)
+                    if "Is Primary Key" in data_dict.columns and any(data_dict["Is Primary Key"].str.lower() == "yes"):
+                        pk_cols = data_dict.loc[data_dict["Is Primary Key"].str.lower() == "yes", "Column Name"].tolist()
+                        if pk_cols:
+                            before = st.session_state.df.shape[0]
+                            st.session_state.df = st.session_state.df.dropna(subset=pk_cols)
+                            after = st.session_state.df.shape[0]
+                            if before != after:
+                                st.info(f"Dropped {before - after} rows with nulls in primary key column(s): {', '.join(pk_cols)}.")
                 # Initialize RootAgent with memory
                 if st.session_state.df is not None and st.session_state.data_dictionary is not None:
                     if (
@@ -775,6 +788,18 @@ def main():
                 if st.button("Apply Changes and Next", key=f"apply_next_{step}"):
                     cleaned_df = st.session_state.df.copy()
                     step_logs = []
+                    # --- Drop rows with nulls in primary key columns if present (only for MissingValueAgent step) ---
+                    if agent_name == "Missing Values":
+                        data_dict = st.session_state.data_dictionary
+                        # Only drop if user explicitly marked a column as primary key (not inferred)
+                        if "Is Primary Key" in data_dict.columns and any(data_dict["Is Primary Key"].str.lower() == "yes"):
+                            pk_cols = data_dict.loc[data_dict["Is Primary Key"].str.lower() == "yes", "Column Name"].tolist()
+                            if pk_cols:
+                                before = cleaned_df.shape[0]
+                                cleaned_df = cleaned_df.dropna(subset=pk_cols)
+                                after = cleaned_df.shape[0]
+                                if before != after:
+                                    st.info(f"Dropped {before - after} rows with nulls in primary key column(s): {', '.join(pk_cols)}.")
                     try:
                         for column, data in st.session_state.user_choices.items():
                             # Only apply changes for columns relevant to this agent
