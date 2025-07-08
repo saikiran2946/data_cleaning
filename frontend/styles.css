@@ -3,13 +3,13 @@
 /* --- General --- */
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-    color: #2c3e50;
+    background: var(--background-color, #f5f7fa);
+    color: var(--text-color, #2c3e50);
 }
 
 /* --- Containers --- */
 [data-testid="stAppViewContainer"] {
-    background-color: rgba(255, 255, 255, 0.95);
+    background-color: var(--background-color, #fff);
     border-radius: 15px;
     box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15);
     backdrop-filter: blur(4px);
@@ -18,11 +18,70 @@ body {
 }
 
 [data-testid="stHeader"] {
-    background: linear-gradient(to right, #1a374d, #406882);
-    color: white;
-    padding: 1.5rem;
-    border-radius: 12px;
-    margin-bottom: 2rem;
+    background: linear-gradient(270deg, #223A5E, #406882, #1B263B, #223A5E);
+    background-size: 600% 600%;
+    animation: gradientMove 12s ease infinite;
+    color: #fff;
+    padding: 2.2rem 2.8rem 2.2rem 2.8rem;
+    border-radius: 0 0 22px 22px;
+    margin-bottom: 2.5rem;
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.22);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 72px;
+    font-family: 'Nunito', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    position: relative;
+    border-bottom: 3px solid #4fd1c5;
+    /* Glassmorphism */
+    backdrop-filter: blur(10px) saturate(160%);
+    background-blend-mode: overlay;
+}
+
+@keyframes gradientMove {
+    0% {background-position:0% 50%;}
+    50% {background-position:100% 50%;}
+    100% {background-position:0% 50%;}
+}
+
+[data-testid="stHeader"] * {
+    color: #fff !important;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+[data-testid="stHeader"] .stMarkdown {
+    margin: 0;
+    padding: 0;
+    font-size: 2.1rem;
+    font-family: 'Nunito', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    text-shadow: 0 2px 12px rgba(31, 38, 135, 0.18);
+}
+
+[data-testid="stHeader"] > div:last-child {
+    display: flex;
+    align-items: center;
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    transition: text-shadow 0.2s, color 0.2s;
+    text-shadow: 0 2px 8px #223A5E;
+    cursor: pointer;
+}
+[data-testid="stHeader"] > div:last-child:hover {
+    color: #4fd1c5 !important;
+    text-shadow: 0 0 12px #4fd1c5, 0 2px 8px #223A5E;
+}
+
+[data-testid="stHeader"]::after {
+    content: '';
+    position: absolute;
+    left: 10px; right: 10px; bottom: 0;
+    height: 4px;
+    border-radius: 0 0 8px 8px;
+    background: linear-gradient(90deg, #4fd1c5 0%, #38b2ac 50%, #4fd1c5 100%);
+    box-shadow: 0 0 16px 2px #4fd1c5;
+    opacity: 0.7;
 }
 
 /* --- Buttons --- */
@@ -31,8 +90,8 @@ body {
     padding: 12px 24px;
     font-weight: 600;
     border: none;
-    color: white;
-    background: linear-gradient(135deg, #1e6091 0%, #164e73 100%);
+    color: var(--button-text-color, white);
+    background: linear-gradient(135deg, var(--primary-color, #1e6091) 0%, var(--secondary-background-color, #164e73) 100%);
     transition: all 0.3s ease;
     box-shadow: 0 4px 15px rgba(30, 96, 145, 0.2);
 }
@@ -40,7 +99,7 @@ body {
 .stButton>button:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(30, 96, 145, 0.3);
-    background: linear-gradient(135deg, #164e73 0%, #0d3b5c 100%);
+    background: linear-gradient(135deg, var(--secondary-background-color, #164e73) 0%, #0d3b5c 100%);
 }
 
 /* --- Progress Tracker --- */
@@ -49,7 +108,7 @@ body {
     justify-content: space-between;
     margin: 2rem 0;
     padding: 1rem;
-    background: white;
+    background: var(--background-color, white);
     border-radius: 12px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
@@ -61,11 +120,11 @@ body {
 }
 
 .progress-step.completed {
-    color: #2ecc71;
+    color: var(--success-color, #2ecc71);
 }
 
 .progress-step.active {
-    color: #1e6091;
+    color: var(--primary-color, #1e6091);
     font-weight: bold;
 }
 
@@ -73,7 +132,7 @@ body {
 [data-testid="stExpander"] {
     border: none;
     border-radius: 12px;
-    background-color: white;
+    background-color: var(--background-color, white);
     margin-bottom: 1.5rem;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
     transition: all 0.3s ease;
@@ -86,25 +145,25 @@ body {
 [data-testid="stExpander"] .streamlit-expanderHeader {
     font-size: 1.3rem;
     font-weight: 600;
-    color: #1a374d;
+    color: var(--primary-color, #1a374d);
     padding: 1rem;
 }
 
 /* --- Custom Text Styles --- */
 .agent-reasoning {
-    background: linear-gradient(135deg, #e7f3ff 0%, #f0f7ff 100%);
-    border-left: 5px solid #1e6091;
+    background: linear-gradient(135deg, var(--secondary-background-color, #e7f3ff) 0%, var(--background-color, #f0f7ff) 100%);
+    border-left: 5px solid var(--primary-color, #1e6091);
     padding: 1.5rem;
     margin: 1rem 0;
     border-radius: 8px;
     font-style: italic;
-    color: #2c3e50;
+    color: var(--text-color, #2c3e50);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 /* --- Data Preview Containers --- */
 .data-preview {
-    background: white;
+    background: var(--background-color, white);
     border-radius: 8px;
     padding: 1rem;
     margin: 1rem 0;
@@ -113,30 +172,30 @@ body {
 
 /* --- Modification Panel --- */
 .modification-panel {
-    background: #f8fafc;
+    background: var(--secondary-background-color, #f8fafc);
     border-radius: 10px;
     padding: 1.5rem;
     margin: 1rem 0;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--secondary-background-color, #e2e8f0);
 }
 
 .modification-panel h4 {
-    color: #1a374d;
+    color: var(--primary-color, #1a374d);
     margin-bottom: 1rem;
 }
 
 /* --- Success/Warning Messages --- */
 .success-message {
-    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-    color: #155724;
+    background: linear-gradient(135deg, var(--success-background, #d4edda) 0%, var(--success-background2, #c3e6cb) 100%);
+    color: var(--success-color, #155724);
     padding: 1rem;
     border-radius: 8px;
     margin: 1rem 0;
 }
 
 .warning-message {
-    background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
-    color: #856404;
+    background: linear-gradient(135deg, var(--warning-background, #fff3cd) 0%, var(--warning-background2, #ffeeba) 100%);
+    color: var(--warning-color, #856404);
     padding: 1rem;
     border-radius: 8px;
     margin: 1rem 0;
@@ -144,4 +203,212 @@ body {
 
 .profile-column-label {
     font-weight: bold;
-} 
+}
+
+/* --- Dark mode overrides --- */
+@media (prefers-color-scheme: dark) {
+    body {
+        background: var(--background-color, #18191A);
+        color: var(--text-color, #F5F6FA);
+    }
+    [data-testid="stAppViewContainer"],
+    .data-preview,
+    .modification-panel,
+    [data-testid="stExpander"] {
+        background-color: var(--background-color, #23272F) !important;
+        color: var(--text-color, #F5F6FA) !important;
+    }
+    [data-testid="stHeader"] {
+        background: linear-gradient(270deg, #1B263B, #223A5E, #406882, #1B263B);
+        background-size: 600% 600%;
+        animation: gradientMove 12s ease infinite;
+        color: #F5F6FA;
+        box-shadow: 0 8px 32px rgba(20, 20, 40, 0.32);
+        border-bottom: 3px solid #63e6be;
+    }
+    [data-testid="stHeader"] * {
+        color: #F5F6FA !important;
+    }
+    .stButton>button {
+        color: var(--button-text-color, #F5F6FA);
+        background: linear-gradient(135deg, var(--primary-color, #223A5E) 0%, var(--secondary-background-color, #1B263B) 100%);
+    }
+    .stButton>button:hover {
+        background: linear-gradient(135deg, var(--secondary-background-color, #1B263B) 0%, #0d3b5c 100%);
+    }
+    .agent-reasoning {
+        background: linear-gradient(135deg, var(--secondary-background-color, #23272F) 0%, var(--background-color, #18191A) 100%);
+        color: var(--text-color, #F5F6FA);
+        border-left: 5px solid var(--primary-color, #223A5E);
+    }
+    .success-message {
+        background: linear-gradient(135deg, var(--success-background, #223A5E) 0%, var(--success-background2, #1B263B) 100%);
+        color: var(--success-color, #A3E635);
+    }
+    .warning-message {
+        background: linear-gradient(135deg, var(--warning-background, #3E2723) 0%, var(--warning-background2, #FFB300) 100%);
+        color: var(--warning-color, #FFD600);
+    }
+    [data-testid="stHeader"]::after {
+        background: linear-gradient(90deg, #63e6be 0%, #38b2ac 50%, #63e6be 100%);
+        box-shadow: 0 0 18px 3px #63e6be;
+    }
+}
+
+/* --- Ensure all labels and radio text are visible in both modes --- */
+label, .stRadio label, .secondary-label {
+    color: var(--secondary-text-color, #6c757d) !important;
+    opacity: 1 !important;
+}
+@media (prefers-color-scheme: dark) {
+    label, .stRadio label, .secondary-label {
+        color: var(--secondary-text-color, #CCCCCC) !important;
+    }
+}
+
+/* General text color for both modes */
+html, body, .block-container {
+    color: var(--text-color, #333);
+}
+
+/* Light/Dark mode-safe labels */
+label, .stRadio label, .secondary-label {
+    color: inherit;
+}
+
+/* Inline display for summary info inside expanders */
+.inline-info {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+}
+
+.inline-info span {
+    flex: 1 1 auto;
+    color: inherit;
+}
+
+/* Dark mode specific overrides */
+@media (prefers-color-scheme: dark) {
+    html, body, .block-container {
+        color: #EEE;
+    }
+
+    label, .stRadio label, .secondary-label {
+        color: #CCC !important;
+    }
+
+    .inline-info span {
+        color: #DDD !important;
+    }
+}
+
+/* --- File Uploader Visibility Fixes --- */
+/* Sidebar uploader label and text */
+[data-testid="stSidebar"] .stFileUploader label,
+[data-testid="stSidebar"] .stFileUploader,
+[data-testid="stSidebar"] .stFileUploader .uploadedFileName,
+[data-testid="stSidebar"] .stFileUploader .stFileUploaderDropzone,
+[data-testid="stSidebar"] .stFileUploader .stFileUploaderDetails {
+    color: #1a1a1a !important;
+    font-weight: 600 !important;
+    opacity: 1 !important;
+}
+
+/* Main area uploader label and text */
+.stFileUploader label,
+.stFileUploader,
+.stFileUploader .uploadedFileName,
+.stFileUploader .stFileUploaderDropzone,
+.stFileUploader .stFileUploaderDetails {
+    color: #1a1a1a !important;
+    font-weight: 600 !important;
+    opacity: 1 !important;
+}
+
+/* Uploaded file name and details */
+.stFileUploader .uploadedFileName,
+.stFileUploader .stFileUploaderDetails {
+    color: #1a1a1a !important;
+    font-weight: 600 !important;
+    opacity: 1 !important;
+}
+
+/* Dark mode overrides for file uploader */
+@media (prefers-color-scheme: dark) {
+    [data-testid="stSidebar"] .stFileUploader label,
+    [data-testid="stSidebar"] .stFileUploader,
+    [data-testid="stSidebar"] .stFileUploader .uploadedFileName,
+    [data-testid="stSidebar"] .stFileUploader .stFileUploaderDropzone,
+    [data-testid="stSidebar"] .stFileUploader .stFileUploaderDetails,
+    .stFileUploader label,
+    .stFileUploader,
+    .stFileUploader .uploadedFileName,
+    .stFileUploader .stFileUploaderDropzone,
+    .stFileUploader .stFileUploaderDetails {
+        color: #F5F6FA !important;
+        font-weight: 600 !important;
+        opacity: 1 !important;
+    }
+}
+
+/* Ensure text above and below uploader is visible */
+[data-testid="stSidebar"] .stRadio label,
+[data-testid="stSidebar"] .stText,
+[data-testid="stSidebar"] .stMarkdown,
+.stRadio label,
+.stText,
+.stMarkdown {
+    color: #1a1a1a !important;
+    opacity: 1 !important;
+    font-weight: 500 !important;
+}
+@media (prefers-color-scheme: dark) {
+    [data-testid="stSidebar"] .stRadio label,
+    [data-testid="stSidebar"] .stText,
+    [data-testid="stSidebar"] .stMarkdown,
+    .stRadio label,
+    .stText,
+    .stMarkdown {
+        color: #F5F6FA !important;
+        opacity: 1 !important;
+        font-weight: 500 !important;
+    }
+}
+
+/* Sidebar background for better contrast */
+[data-testid="stSidebar"] {
+    background: #f7fafc !important;
+    box-shadow: 2px 0 16px 0 rgba(31, 38, 135, 0.06);
+}
+
+/* File uploader dropzone: light background for visibility */
+.stFileUploader .stFileUploaderDropzone {
+    background: #f1f5f9 !important;
+    color: #1a1a1a !important;
+    border-radius: 14px !important;
+    border: 1.5px solid #d1d5db !important;
+    box-shadow: 0 2px 8px rgba(31, 38, 135, 0.07);
+}
+
+.stFileUploader .stFileUploaderDropzone * {
+    color: #1a1a1a !important;
+}
+
+@media (prefers-color-scheme: dark) {
+    [data-testid="stSidebar"] {
+        background: #23272F !important;
+        box-shadow: 2px 0 16px 0 rgba(31, 38, 135, 0.12);
+    }
+    .stFileUploader .stFileUploaderDropzone {
+        background: #2d3748 !important;
+        color: #F5F6FA !important;
+        border: 1.5px solid #4fd1c5 !important;
+    }
+    .stFileUploader .stFileUploaderDropzone * {
+        color: #F5F6FA !important;
+    }
+}

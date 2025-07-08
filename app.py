@@ -12,6 +12,7 @@ from utils.openai_client import llm
 import backend.agents.duplicate_agent as duplicate_agent_module
 import re
 from pandas.api.types import CategoricalDtype
+import pathlib
 
 # Add a helper to ensure Arrow compatibility before displaying DataFrames
 def ensure_arrow_compatible(df):
@@ -69,6 +70,12 @@ st.markdown("""
     .profile-column-label { font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
+
+# Inject custom CSS
+css_path = pathlib.Path("frontend/styles.css")
+if css_path.exists():
+    with open(css_path) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 # --- Header ---
 st.markdown("<h1 style='text-align: center; color: #4F8BF9;'>AI Data Cleaning Agent</h1>", unsafe_allow_html=True)
