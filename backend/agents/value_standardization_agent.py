@@ -16,8 +16,12 @@ class ValueStandardizationAgent(BaseAgent):
         sample_lines = []
         for col in self.df.columns:
             try:
-                uniques = self.df[col].dropna().astype(str).unique()[:10].tolist()
+                uniques_full = self.df[col].dropna().astype(str).unique().tolist()
+                uniques = uniques_full[:20]
+                print(f"[DEBUG] Unique values for {col}: {uniques_full}")
                 sample_lines.append(f"- {col}: {uniques}")
+                if len(uniques_full) > 100:
+                    sample_lines.append(f"  [WARNING: Only first 100 of {len(uniques_full)} unique values shown.]")
             except Exception as e:
                 sample_lines.append(f"- {col}: [Could not extract unique values: {e}]")
         sample_block = "\n".join(sample_lines)
@@ -31,7 +35,8 @@ You are an expert Data Engineer responsible for standardizing values in a datase
 
 For each column, you MUST:
 - Only process columns that are present in the dataset (see list above).
-- Analyze the column's data type, unique values (see sample above), and business context.
+- Analyze the column's data type, ALL unique values (not just the sample above), and business context.
+- If the sample above is not exhaustive (i.e., the column has more unique values than shown), you MUST request more values or assume there are additional variations to standardize.
 - Map all non-standard, inconsistent, placeholder, or ambiguous values (e.g., 'Unknown', 'N/A', '-', '', 'null', 'none', 'missing', etc.) to either a canonical value or to NaN/empty string as appropriate for the column type.
 - For categorical/text columns: Map all abbreviations, case variations, typos, synonyms, and partial matches to a single, contextually appropriate canonical value.
 - For numeric columns: Map all non-numeric, placeholder, or corrupted values to NaN or a valid missing value indicator.
@@ -41,6 +46,7 @@ For each column, you MUST:
 - If a value is already valid and canonical, map it to itself.
 - After mapping, there should be no abbreviations, case variations, placeholders, or invalid values left—only canonical or valid values for the column type.
 - **Only include mappings for values that need to be changed. If a value is already canonical, do not include it in the output mapping.**
+- **You MUST check for abbreviations, synonyms, typos, and case variations in ALL unique values, not just the sample above. If the column has more than 100 unique values, assume there are additional variations to standardize and do not skip standardization if any non-canonical value is present.**
 
 **Contextual Explanation:**
 - For each mapping, provide a clear, context-based explanation for why the mapping is necessary and how it improves data quality, consistency, or downstream analysis.
@@ -112,6 +118,7 @@ Return your response inside a single markdown code block as a JSON object.
 
     def _parse_llm_response(self, response: str, profile: list):
         try:
+            print(f"[DEBUG] LLM response: {response}")
             json_str = self._extract_json(response)
             data = json.loads(json_str)
             actions = data.get("columns", [])

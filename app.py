@@ -293,7 +293,6 @@ def display_value_standardization_ui(agent):
             st.write("**Current unique values in this column:**")
             if column_name in st.session_state.df.columns:
                 unique_vals = st.session_state.df[column_name].dropna().unique()
-                # Ensure unique_vals is a numpy array before calling .tolist()
                 if hasattr(unique_vals, 'tolist'):
                     unique_vals_list = unique_vals.tolist()
                 else:
@@ -305,7 +304,13 @@ def display_value_standardization_ui(agent):
                 st.warning(f"Column '{column_name}' not found in current dataset")
             st.write("**Suggested Mappings:**")
             st.json(mappings)
-            st.session_state.user_choices[column_name] = {"agent": agent, "choice": col_action}
+            # Add Yes/No radio for user to accept or skip
+            accept_options = ["Yes", "No"]
+            accept_choice = st.radio(f"Accept value standardization for {column_name}?", accept_options, index=0, key=f"vs_accept_{column_name}")
+            if accept_choice == "Yes":
+                st.session_state.user_choices[column_name] = {"agent": agent, "choice": {"accept": True, **col_action}}
+            else:
+                st.session_state.user_choices[column_name] = {"agent": agent, "choice": {"accept": False, **col_action}}
 
 def display_feature_generation_ui(agent):
     """Display the UI for feature generation suggestions and user selection."""
@@ -806,6 +811,10 @@ def main():
                             if data.get("agent") != agent:
                                 continue
                             choice = data["choice"]
+                            # For ValueStandardizationAgent, only apply if accept == True
+                            if agent_name == "Value Standardization":
+                                if not choice.get("accept", False):
+                                    continue  # Skip if not accepted
                             # Special handling for ValidatingAgent: use real column from user_choice
                             if agent_name == "Validation" and column.startswith("validate_"):
                                 actual_col = choice.get("column", None)
