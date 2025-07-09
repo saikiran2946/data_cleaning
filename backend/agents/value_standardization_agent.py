@@ -115,16 +115,17 @@ Return your response inside a single markdown code block as a JSON object.
         for m in mappings:
             from_val = m["from"]
             to_val = m["to"]
-            # If this is the main mapping dict (from the 'Mappings' key), merge it in
-            if from_val == "Mappings" and isinstance(to_val, dict):
+            # If this is the main mapping dict (from the 'mappings' key), use it directly and ignore all others
+            if from_val.lower() == "mappings" and isinstance(to_val, dict):
                 for k, v in to_val.items():
                     if k != v:
                         if v in [None, "null", "None", "", "nan"]:
                             mapping_dict[k] = None
                         else:
                             mapping_dict[k] = v
+                break  # Stop after using the 'mappings' dict
             # Ignore explanations and other non-mapping entries
-            elif from_val not in ["Explanation", "Mappings"]:
+            elif from_val.lower() not in ["explanation", "mappings"]:
                 if from_val != to_val:
                     if to_val in [None, "null", "None", "", "nan"]:
                         mapping_dict[from_val] = None
