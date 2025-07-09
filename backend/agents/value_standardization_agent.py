@@ -113,14 +113,23 @@ Return your response inside a single markdown code block as a JSON object.
             return ""
         mapping_dict = {}
         for m in mappings:
-            from_val = str(m["from"]).strip()
+            from_val = m["from"]
             to_val = m["to"]
-            if from_val != to_val:
-                # Convert JSON null/None/empty string/nan to Python None
-                if to_val in [None, "null", "None", "", "nan"]:
-                    mapping_dict[from_val] = None
-                else:
-                    mapping_dict[from_val] = to_val
+            # If this is the main mapping dict (from the 'Mappings' key), merge it in
+            if from_val == "Mappings" and isinstance(to_val, dict):
+                for k, v in to_val.items():
+                    if k != v:
+                        if v in [None, "null", "None", "", "nan"]:
+                            mapping_dict[k] = None
+                        else:
+                            mapping_dict[k] = v
+            # Ignore explanations and other non-mapping entries
+            elif from_val not in ["Explanation", "Mappings"]:
+                if from_val != to_val:
+                    if to_val in [None, "null", "None", "", "nan"]:
+                        mapping_dict[from_val] = None
+                    else:
+                        mapping_dict[from_val] = to_val
         if not mapping_dict:
             return ""
         code_lines = [
