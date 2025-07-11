@@ -7,8 +7,9 @@ from backend.agents.value_standardization_agent import ValueStandardizationAgent
 from backend.agents.feature_generation_agent import FeatureGenerationAgent
 from backend.agents.validating_agent import ValidatingAgent
 from backend.agents.general_issue_agent import GeneralIssueAgent
-from utils.openai_client import llm
+from utils.openai_client import llm, invoke_with_tracking
 import json
+import numpy as np
 
 class RootAgent:
     """
@@ -50,25 +51,38 @@ class RootAgent:
         profile_parts = []
         profile_parts.append("DATASET PROFILE:")
         profile_parts.append(f"Shape: {self.df.shape}")
+        # Always include full dtypes listing
         profile_parts.append("\nColumns and Data Types:")
         profile_parts.append(self.df.dtypes.to_string())
-        
+        # List numeric columns
+        numeric_cols = self.df.select_dtypes(include=np.number).columns.tolist()
+        profile_parts.append(f"\nNumeric columns: {numeric_cols}")
+        # Numeric columns summary
+        if numeric_cols:
+            profile_parts.append("\nNumeric Columns Summary (describe):")
+            profile_parts.append(self.df[numeric_cols].describe().T.to_string())
+            # For each numeric column, show a few non-null sample values
+            for col in numeric_cols:
+                non_null_vals = self.df[col].dropna().head(5).tolist()
+                profile_parts.append(f"Sample values for {col}: {non_null_vals}")
+        else:
+            profile_parts.append("\nNo numeric columns found.")
+        # Missing values
         missing_values = self.df.isnull().sum()
         if missing_values.sum() > 0:
             profile_parts.append("\nMissing Values per Column:")
             profile_parts.append(missing_values[missing_values > 0].to_string())
         else:
             profile_parts.append("\nMissing Values: None found.")
-            
+        # Duplicates
         if self.df.duplicated().sum() > 0:
             profile_parts.append(f"\nDuplicate Rows: Found {self.df.duplicated().sum()} duplicate rows.")
         else:
             profile_parts.append("\nDuplicate Rows: None found.")
-
+        # Sample rows
         profile_parts.append("\nSample Rows:")
         profile_parts.append(self.df.head(5).to_string(index=False))
-
-        # Add unique value samples for categorical/text columns
+        # Unique value samples for categorical/text columns
         for col in self.df.select_dtypes(include=['object', 'category']):
             unique_vals = self.df[col].dropna().unique()
             profile_parts.append(f"Column '{col}' unique values (sample): {list(unique_vals[:10])}")
@@ -139,7 +153,7 @@ Example Output Format (as plain text, not a code block):
   ]
 }}
 '''
-        response = llm.invoke(prompt)
+        response = invoke_with_tracking(llm.invoke, prompt, agent_name="CleaningPlan")
         
         try:
             content = response.content.strip()
